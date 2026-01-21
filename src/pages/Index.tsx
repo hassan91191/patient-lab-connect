@@ -110,7 +110,7 @@ export default function Index() {
     }
   };
 
-  // Handle file view/download
+  // Handle file view (opens in new tab)
   const handleViewFile = async (file: PatientFile) => {
     if (state.status !== 'loaded') return;
 
@@ -127,6 +127,31 @@ export default function Index() {
     // Open file in new tab
     const downloadUrl = getFileDownloadUrl(lab, patientId, file.fileId);
     window.open(downloadUrl, '_blank');
+  };
+
+  // Handle file download (direct download to device)
+  const handleDownloadFile = async (file: PatientFile) => {
+    if (state.status !== 'loaded') return;
+
+    const { lab, patientId } = state;
+
+    // Log access first (must happen on EVERY click)
+    try {
+      await logFileAccess(lab, patientId, file.fileId, file.name);
+    } catch (error) {
+      console.error('Failed to log file access:', error);
+      // Continue to download file even if logging fails
+    }
+
+    // Trigger download
+    const downloadUrl = getFileDownloadUrl(lab, patientId, file.fileId);
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = file.name;
+    link.target = '_blank';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   // Handle retry
@@ -146,8 +171,8 @@ export default function Index() {
       <main className="flex-1 flex flex-col">
         {state.status === 'missing-lab' && (
           <ErrorState
-            title="معلمات غير صالحة"
-            message="الرابط المستخدم غير صحيح. يرجى التأكد من استخدام الرابط الصحيح للوصول إلى نتائج التحاليل."
+            title="جاري تحميل البيانات..."
+            message="إذا تأخر تحميل البيانات، يرجى التأكد من استخدام الرابط الصحيح للوصول إلى النتائج."
             showLabIcon
           />
         )}
@@ -159,7 +184,11 @@ export default function Index() {
         {state.status === 'loading' && <LoadingSkeleton />}
 
         {state.status === 'loaded' && (
-          <FileList files={state.files} onViewFile={handleViewFile} />
+          <FileList 
+            files={state.files} 
+            onViewFile={handleViewFile} 
+            onDownloadFile={handleDownloadFile}
+          />
         )}
 
         {state.status === 'error' && (
